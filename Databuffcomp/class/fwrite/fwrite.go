@@ -60,3 +60,23 @@ func FtoStrm(dest string, filename string) ([]byte, error) {
 	return bt_arr, code
 
 }
+
+func UnFtoStrm(dest string, filename string) []byte {
+
+	var bt_arr []byte
+
+	bt_arr, _ = os.ReadFile(dest + filename)
+
+	return bt_arr
+
+}
+
+func FExst(fpath string) error {
+
+	var code error
+
+	//write code here
+
+	return code
+
+}
