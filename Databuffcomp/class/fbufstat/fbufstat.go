@@ -3,11 +3,11 @@ package fbufstat
 import "encoding/json"
 
 type Bufstat struct {
-	N_itm     uint   `json:"n_itm"`
-	Buff_size uint32 `json:"buff_size"`
+	N_itm     int `json:"n_itm"`
+	Buff_size int `json:"buff_size"`
 }
 
-func New(nf uint, bsize uint32) Bufstat {
+func New(nf int, bsize int) Bufstat {
 
 	Ftable := Bufstat{nf, bsize}
 
@@ -45,7 +45,7 @@ func (Class Bufstat) GetJSONObj() []byte {
 
 }
 
-func (Class *Bufstat) UpdateSize(buf uint32) {
+func (Class *Bufstat) UpdateSize(buf int) {
 
 	Class.Buff_size += buf
 

@@ -6,11 +6,20 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func LogWriteFile(dest string, filename string, i uint, size uint32) {
+type LogWrite struct {
+	Level   string `json:"level"`
+	Id      int    `json:"Id"`
+	Size    int    `json:"size"`
+	Name    string `json:"name"`
+	Time    string `json:"time"`
+	Message string `json:"message"`
+}
+
+func LogWriteFile(dest string, filename string, i int, size int, fname string) {
 	file, err := os.OpenFile(
 		dest+filename,
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
-		0664,
+		0666,
 	)
 	if err != nil {
 		panic(err)
@@ -20,5 +29,5 @@ func LogWriteFile(dest string, filename string, i uint, size uint32) {
 
 	logger := zerolog.New(file).With().Timestamp().Logger()
 
-	logger.Info().Uint("id", i).Uint32("size", size).Msg("Write file")
+	logger.Info().Int("id", i).Int("size", size).Str("name", fname).Msg("Write file")
 }

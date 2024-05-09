@@ -9,6 +9,7 @@ i.e Reading single file
 */
 
 import (
+	"bufio"
 	"encoding/json"
 	"io/fs"
 	"os"
@@ -24,18 +25,20 @@ func StructToByte(buf any) []byte {
 
 }
 
-func PrintStToF(dest string, filename string, mod fs.FileMode, DtStr any) error {
+func PrintStToF(dest string, filename string, mod fs.FileMode, DtStr any) (int, error) {
 
 	var code error
+	var fsize int
 
 	buf := StructToByte(DtStr)
+	fsize = len(buf)
 
 	//0644 read-only mod for other users.
 	//0666 THE NUMBER OF THE BEAST! Read and write for all!
 	//Remember WriteFile return nil with success.
 	code = os.WriteFile(dest+filename, buf, mod)
 
-	return code
+	return fsize, code
 
 }
 
@@ -71,12 +74,23 @@ func UnFtoStrm(dest string, filename string) []byte {
 
 }
 
-func FExst(fpath string) error {
+func RFbyLine(dest string, filename string) ([]string, int) {
 
-	var code error
+	var buf []string
+	i := 0
 
-	//write code here
+	file, _ := os.Open(dest + filename)
+	scanner := bufio.NewScanner(file)
 
-	return code
+	for scanner.Scan() {
+		line := scanner.Text()
+		buf = append(buf, line)
+		i++
+
+	}
+
+	file.Close()
+
+	return buf, i
 
 }
