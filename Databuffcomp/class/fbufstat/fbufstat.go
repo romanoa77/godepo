@@ -1,31 +1,43 @@
 package fbufstat
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"sync"
+)
 
 type Bufstat struct {
 	N_itm     int `json:"n_itm"`
 	Buff_size int `json:"buff_size"`
 }
 
-func New(nf int, bsize int) Bufstat {
+var instance *Bufstat
+var once sync.Once
+var mu sync.Mutex
+var nu sync.Mutex
 
-	Ftable := Bufstat{nf, bsize}
+func GetInst() *Bufstat {
 
-	return Ftable
+	once.Do(func() {
 
+		instance = &Bufstat{0, 0}
+
+	})
+
+	return instance
 }
 
-func NewObj(buf []byte) Bufstat {
+func (Class *Bufstat) SetStat(buf []byte) {
 
 	var Ftable Bufstat
 
 	json.Unmarshal(buf, &Ftable)
 
-	return Ftable
+	Class.N_itm = Ftable.N_itm
+	Class.Buff_size = Ftable.Buff_size
 
 }
 
-func (Class Bufstat) GetObj() Bufstat {
+func (Class *Bufstat) GetObj() *Bufstat {
 
 	return Class
 
@@ -33,7 +45,17 @@ func (Class Bufstat) GetObj() Bufstat {
 
 func (Class *Bufstat) UpdateCnt() {
 
+	mu.Lock()
 	Class.N_itm += 1
+	mu.Unlock()
+
+}
+
+func (Class *Bufstat) CancCnt() {
+
+	mu.Lock()
+	Class.N_itm -= 1
+	mu.Unlock()
 
 }
 
@@ -47,6 +69,25 @@ func (Class Bufstat) GetJSONObj() []byte {
 
 func (Class *Bufstat) UpdateSize(buf int) {
 
+	mu.Lock()
 	Class.Buff_size += buf
+	mu.Unlock()
+
+}
+
+func (Class *Bufstat) CancSize(buf int) {
+
+	mu.Lock()
+	Class.Buff_size -= buf
+	mu.Unlock()
+
+}
+
+func (Class *Bufstat) UpdateSt(bufs int) {
+
+	mu.Lock()
+	Class.N_itm += 1
+	Class.Buff_size += bufs
+	mu.Unlock()
 
 }

@@ -1,123 +1,113 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
-	"strconv"
 
+	"base.url/class/appmodel"
+	"base.url/class/appstr"
+	"base.url/class/dsstat"
+	"base.url/class/envdef"
 	"base.url/class/fbufstat"
 	"base.url/class/fwrite"
 	"base.url/class/simplelogger"
 	"github.com/gin-gonic/gin"
 )
 
-/*
-type fstat struct {
-	Id        int    `json:"id"`
-	Timestamp string `json:"timestamp"`
-}
-
-*/
-
-type gw struct {
-	H_data []float64 `json:"h"`
-	T_data []float64 `json:"t"`
-}
-
-const baseadm = "adm/"
-const baseadmn = "StatDesc.json"
-
-const basedata = "data/"
-
-const baselog = "log/"
-const baselogn = "LogStream.json"
-
 func main() {
 
-	StatDesc := fbufstat.NewObj(fwrite.UnFtoStrm(baseadm, baseadmn))
+	StatDesc := fbufstat.GetInst()
+	DSDesc := dsstat.GetInst()
+
+	wrtch := make(chan fbufstat.Bufstat)
+
+	if initstat(envdef.Baseadm, envdef.Baseadmn, StatDesc) != nil {
+
+		simplelogger.LogPanic("FATAL ERROR", "FS ERROR")
+
+	}
+
+	simplelogger.LogGreet("DB ready")
+
+	App := appstr.ConcrH{}
+
+	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.Default()
 
-	router.GET("/stat", getStat(&StatDesc))
-	router.GET("/dumpLogF", getLogF())
+	initapp(router, App, StatDesc, DSDesc, wrtch)
 
-	router.POST("/sendF", postFile(&StatDesc))
+	srv := &http.Server{Addr: envdef.Basesrvurl, Handler: router}
 
-	router.Run("localhost:8080")
+	go worker(wrtch)
 
-}
+	srv.ListenAndServe()
 
-func getStat(Table *fbufstat.Bufstat) gin.HandlerFunc {
-
-	return func(ctx *gin.Context) {
-
-		ctx.IndentedJSON(http.StatusOK, Table)
-
-	}
+	close(wrtch)
 
 }
 
-func getLogF() gin.HandlerFunc {
+func worker(Bch chan fbufstat.Bufstat) {
 
-	return func(ctx *gin.Context) {
+	var Buf fbufstat.Bufstat
+	var err error
 
-		var BufSl []simplelogger.LogWrite
-		var BufLog simplelogger.LogWrite
-		var bufst []string
+	for {
 
-		var count int
+		select {
 
-		bufst, count = fwrite.RFbyLine(baselog, baselogn)
+		case Buf = <-Bch:
 
-		for i := 0; i < count; i++ {
+			_, err = fwrite.PrintStToF(envdef.Baseadm, envdef.Baseadmn, 0666, Buf)
 
-			lineb := []byte(bufst[i])
-			json.Unmarshal(lineb, &BufLog)
-			BufSl = append(BufSl, BufLog)
+			if err != nil {
+
+				simplelogger.LogPanic("FATAL ERROR", "FS ERROR")
+
+			}
 
 		}
 
-		ctx.IndentedJSON(http.StatusOK, BufSl)
-
 	}
 
 }
 
-func postFile(Stpt *fbufstat.Bufstat) gin.HandlerFunc {
+func initstat(rtdir string, rtfname string, Buf *fbufstat.Bufstat) error {
+	var err error
+	var cbuf []byte
+
+	cbuf, err = fwrite.UnFtoStrm(rtdir, rtfname)
+
+	if err == nil {
+
+		Buf.SetStat(cbuf)
+	}
+
+	return err
+}
+
+func PostWho(Desc *dsstat.DSstat) gin.HandlerFunc {
 
 	return func(ctx *gin.Context) {
 
-		var Gwbuf gw
-		var count int
-		var fgwsize int
-		var fgwname string
-		var buf []byte
+		var buf dsstat.Idt
 
-		count = Stpt.N_itm
+		ctx.BindJSON(&buf)
 
-		fgwname = "strmgw" + strconv.Itoa(count) + ".json"
+		Desc.User = buf.User
+		Desc.Token = buf.Token
 
-		// Call BindJSON to bind the received JSON to
-		// newAlbum.
-
-		if err := ctx.BindJSON(&Gwbuf); err != nil {
-			return
-		}
-
-		fgwsize, _ = fwrite.PrintStToF(basedata, fgwname, 0666, Gwbuf)
-
-		simplelogger.LogWriteFile(baselog, baselogn, count, fgwsize, fgwname)
-
-		//Updating app status
-		Stpt.UpdateCnt()
-		Stpt.UpdateSize(fgwsize)
-
-		buf = Stpt.GetJSONObj()
-		fwrite.PrintStrmToF(baseadm, baseadmn, 0666, buf)
-
-		//Response
-		ctx.IndentedJSON(http.StatusCreated, "Written "+string(fgwname)+"for "+strconv.Itoa(fgwsize)+" bytes")
+		ctx.Next()
 
 	}
+}
+
+func initapp(SrvPt *gin.Engine, AppRts appmodel.AbstrApp, Buf *fbufstat.Bufstat, Desc *dsstat.DSstat, Chnl chan fbufstat.Bufstat) {
+
+	SrvPt.GET("/stat", AppRts.GetStat(Buf))
+	SrvPt.GET("/dumpLogF", AppRts.GetLogF())
+	SrvPt.GET("/dstat", AppRts.GetDSdsc(Desc))
+	SrvPt.POST("/sendF", AppRts.PostFile(Buf, Chnl))
+	SrvPt.POST("/upddsc", PostWho(Desc), AppRts.PostDsc(Desc))
+	SrvPt.POST("/cleanall", AppRts.PostClean(Buf, Desc))
 
 }
